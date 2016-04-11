@@ -1,6 +1,6 @@
 window.onload = function() {
 
-var selection = 0;
+var selection = 1;
 
 function change( el ) {
     if ( el.value === "Using CPU" ) {
