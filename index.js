@@ -33,7 +33,7 @@ function sphereIntersection(centerx, centery, centerz, radius, sourcex, sourcey,
     var eoDot = dot(eyeToCenterX, eyeToCenterY, eyeToCenterZ, eyeToCenterX, eyeToCenterY, eyeToCenterZ);
     var discriminant = (radius * radius) - eoDot + (v * v);
     if (discriminant < 0) {
-        return -1;
+        return -9981;
     } else {
         return v - Math.sqrt(discriminant);
     }
@@ -147,6 +147,7 @@ function doit(mode) {
         // }
         var idx = 1;                                     // index for looking through all the objects
         var nextidx = 1;
+		var minDistIsInfinity = 1;
         var minDist = -1; // -1 for infinity
         var minIdx = -1; // idx of the object that intersect with the ray
 
@@ -163,9 +164,10 @@ function doit(mode) {
                     Objects[idx+12],
                     Camera[0], Camera[1], Camera[2],
                     rayX, rayY, rayZ);
-                if (minDist < 0 || distance < minDist && distance >= 0) {
+                if ((minDistIsInfinity == 1 || distance < minDist) && distance != -9981 ){
                     minDist = distance;
                     minIdx = idx;
+					minDistIsInfinity = 0;
                 }
             }
         }
@@ -174,9 +176,9 @@ function doit(mode) {
             var pointAtTimeX = Camera[0] + rayX * minDist;
             var pointAtTimeY = Camera[1] + rayY * minDist;
             var pointAtTimeZ = Camera[2] + rayZ * minDist;
-            var normalX = pointAtTimeX - Objects[idx+9];
-            var normalY = pointAtTimeX - Objects[idx+10];
-            var normalZ = pointAtTimeX - Objects[idx+11];
+            var normalX = pointAtTimeX - Objects[minIdx+9];
+            var normalY = pointAtTimeX - Objects[minIdx+10];
+            var normalZ = pointAtTimeX - Objects[minIdx+11];
             length = vectorLength(normalX, normalY, normalZ);
             normalX = normalX / length;
             normalY = normalY / length;
@@ -193,10 +195,18 @@ function doit(mode) {
                     // var lightX = Lights[idx];
                     // var lightY = Lights[idx+1];
                     // var lightZ = Lights[idx+2];
-                    idx = 1;
-                    nextidx = 1;
+
+					rayX = pointAtTimeX - Lights[j*6+1];
+					rayY = pointAtTimeY - Lights[j*6+2];
+					rayZ = pointAtTimeZ - Lights[j*6+3];
+					length = vectorLength(rayX, rayY, rayZ);
+					rayX = rayX / length;
+					rayY = rayY / length;
+					rayZ = rayZ / length;
+					minDistIsInfinity = 1;
                     minDist = -1; // -1 for infinity
                     minIdx = -1;
+					nextidx = 1;
                     for (var k=0; k<this.constants.OBJCOUNT; k++ ) {
                         idx = nextidx;
                         nextidx = Objects[idx+1]+idx;
@@ -205,25 +215,20 @@ function doit(mode) {
                             // var centery = Objects[idx+10];
                             // var centerz = Objects[idx+11];
                             // var radius = Objects[idx+12];
-                            rayX = pointAtTimeX - Lights[j*6+1];
-                            rayY = pointAtTimeY - Lights[j*6+2];
-                            rayZ = pointAtTimeZ - Lights[j*6+3];
-                            length = vectorLength(rayX, rayY, rayZ);
-                            rayX = rayX / length;
-                            rayY = rayY / length;
-                            rayZ = rayZ / length;
+                            
                             var distance = sphereIntersection(
                                 Objects[idx+9], Objects[idx+10], Objects[idx+11],
                                 Objects[idx+12],
-                                pointAtTimeX,pointAtTimeY,pointAtTimeZ,
+                                pointAtTimeX, pointAtTimeY, pointAtTimeZ,
                                 rayX, rayY, rayZ);
-                            if (minDist < 0 || distance < minDist && distance >= 0) {
+                            if ((minDistIsInfinity == 1 || distance < minDist) && distance != -9981) {
                                 minDist = distance;
                                 minIdx = idx;
+								minDistIsInfinity = 0;
                             }
                         }
                     }
-                    if (minDist > -0.005) { // light visible
+				if (minDistIsInfinity == 1 || minDist > -0.005 /*&& Math.abs(minDist) - Math.abs(length) > -0.005*/) { // light visible
                         //       var contribution = Vector.dotProduct(Vector.unitVector(
                         // Vector.subtract(lightPoint, pointAtTime)), normal);
                         rayX =  Lights[j*6+1] - pointAtTimeX;
@@ -240,11 +245,12 @@ function doit(mode) {
                     }
                 }
             }
+			
             lambertAmount = Math.min(1, lambertAmount);
             this.color(
-                baser * lambertAmount * Objects[minIdx+6],
-                baseg *  lambertAmount * Objects[minIdx+6],
-                baseb * lambertAmount * Objects[minIdx+6]
+                baser * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]),
+                baseg * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]),
+                baseb * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7])
                 );
         } else {
             this.color(0.95,0.95,0.95);                      // By default canvas is light grey
@@ -256,8 +262,8 @@ function doit(mode) {
 var mykernel = doit("gpu");
 var mycode   = doit("cpu");
 gl = mykernel(camera,lights,objects);
-// return ;
-var canvas = mykernel.getCanvas();
+/* return ;
+ */var canvas = mykernel.getCanvas();
 document.getElementsByTagName('body')[0].appendChild(canvas);
 
 var f = document.querySelector("#fps");
@@ -291,15 +297,17 @@ function renderLoop() {
 
     // make one planet spin a little bit faster than the other, just for
     // effect.
-    planet1 += 0.05;
+    planet1 += 0.1;
     planet2 += 0.2;
 
     // set the position of each moon with some trig.
-    objects[10] = - Math.cos(planet1) * 4;
-    objects[12] = Math.sin(planet1) * 4 -20;
+    //objects[10] = - Math.cos(planet1) * 4;
+    //objects[12] = Math.sin(planet1) * 4 -20;
+    objects[10] = Math.sin(planet1) * 3.5;
+    objects[12] = -3 + (Math.cos(planet1) * 3.5);
 
-    // objects[22] = Math.sin(planet2) * 4;
-    // objects[24] = -3 + (Math.cos(planet2) * 4);
+    objects[23] = Math.sin(planet2) * 4;
+    objects[25] = -3 + (Math.cos(planet2) * 4);
 
     // setTimeout(renderLoop,1);            // Uncomment this line, and comment the next line
     if (running) requestAnimationFrame(renderLoop);     // to see how fast this could run...
