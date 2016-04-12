@@ -164,7 +164,7 @@ function doit(mode) {
                     Objects[idx+12],
                     Camera[0], Camera[1], Camera[2],
                     rayX, rayY, rayZ);
-                if ((minDistIsInfinity == 1 || distance < minDist) && distance != -9981 ){
+                if ((minDistIsInfinity == 1 || distance < minDist) && distance != -9981  && distance > 0 ){
                     minDist = distance;
                     minIdx = idx;
 					minDistIsInfinity = 0;
@@ -177,8 +177,8 @@ function doit(mode) {
             var pointAtTimeY = Camera[1] + rayY * minDist;
             var pointAtTimeZ = Camera[2] + rayZ * minDist;
             var normalX = pointAtTimeX - Objects[minIdx+9];
-            var normalY = pointAtTimeX - Objects[minIdx+10];
-            var normalZ = pointAtTimeX - Objects[minIdx+11];
+            var normalY = pointAtTimeY - Objects[minIdx+10];
+            var normalZ = pointAtTimeZ - Objects[minIdx+11];
             length = vectorLength(normalX, normalY, normalZ);
             normalX = normalX / length;
             normalY = normalY / length;
@@ -203,32 +203,33 @@ function doit(mode) {
 					rayX = rayX / length;
 					rayY = rayY / length;
 					rayZ = rayZ / length;
-					minDistIsInfinity = 1;
-                    minDist = -1; // -1 for infinity
-                    minIdx = -1;
-					nextidx = 1;
+					var minDistIsInfinity1 = 1;
+                    var minDist1 = -1; // -1 for infinity
+                    var minIdx1 = -1;
+					var nextidx1 = 1;
+					var idx1 = 1;
                     for (var k=0; k<this.constants.OBJCOUNT; k++ ) {
-                        idx = nextidx;
-                        nextidx = Objects[idx+1]+idx;
-                        if (Objects[idx] == this.constants.SPHERE) {
+                        idx1 = nextidx1;
+                        nextidx1 = Objects[idx1+1]+idx1;
+                        if (Objects[idx1] == this.constants.SPHERE) {
                             // var centerx = Objects[idx+9];
                             // var centery = Objects[idx+10];
                             // var centerz = Objects[idx+11];
                             // var radius = Objects[idx+12];
                             
                             var distance = sphereIntersection(
-                                Objects[idx+9], Objects[idx+10], Objects[idx+11],
-                                Objects[idx+12],
-                                pointAtTimeX, pointAtTimeY, pointAtTimeZ,
+                                Objects[idx1+9], Objects[idx1+10], Objects[idx1+11],
+                                Objects[idx1+12],
+                                Lights[j*6+1], Lights[j*6+2], Lights[j*6+3],
                                 rayX, rayY, rayZ);
-                            if ((minDistIsInfinity == 1 || distance < minDist) && distance != -9981) {
-                                minDist = distance;
-                                minIdx = idx;
-								minDistIsInfinity = 0;
+                            if ((minDistIsInfinity1 == 1 || distance < minDist1) && distance > 0 && distance != -9981) {
+                                minDist1 = distance;
+                                minIdx1 = idx1;
+								minDistIsInfinity1 = 0;
                             }
                         }
                     }
-				if (minDistIsInfinity == 1 || minDist > -0.005 /*&& Math.abs(minDist) - Math.abs(length) > -0.005*/) { // light visible
+					if (minDistIsInfinity1 == 1 || Math.abs(minDist1 - length) <= 0.005 ) { // light visible
                         //       var contribution = Vector.dotProduct(Vector.unitVector(
                         // Vector.subtract(lightPoint, pointAtTime)), normal);
                         rayX =  Lights[j*6+1] - pointAtTimeX;
@@ -245,7 +246,6 @@ function doit(mode) {
                     }
                 }
             }
-			
             lambertAmount = Math.min(1, lambertAmount);
             this.color(
                 baser * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]),
@@ -262,8 +262,8 @@ function doit(mode) {
 var mykernel = doit("gpu");
 var mycode   = doit("cpu");
 gl = mykernel(camera,lights,objects);
-/* return ;
- */var canvas = mykernel.getCanvas();
+// return ;
+var canvas = mykernel.getCanvas();
 document.getElementsByTagName('body')[0].appendChild(canvas);
 
 var f = document.querySelector("#fps");
