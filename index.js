@@ -74,9 +74,9 @@ function doit(mode) {
         var length = 0;
         // var eyeVector = Vector.unitVector(Vector.subtract(cameraVector, cameraPos));
 
-        var eyeVectorX = Camera[3] - Camera[0];
-        var eyeVectorY = Camera[4] - Camera[1];
-        var eyeVectorZ = Camera[5] - Camera[2];
+        var eyeVectorX = Camera[3];// - Camera[0];
+        var eyeVectorY = Camera[4];// - Camera[1];
+        var eyeVectorZ = Camera[5];// - Camera[2];
         length = vectorLength(eyeVectorX, eyeVectorY, eyeVectorZ);
 
         eyeVectorX = eyeVectorX / length;
@@ -348,17 +348,19 @@ function renderLoop() {
 
     // make one planet spin a little bit faster than the other, just for
     // effect.
-    planet1 += 0.1;
-    planet2 += 0.2;
+    planet1 += 0.025;
+    planet2 += 0.05;
 
     // set the position of each moon with some trig.
     //objects[10] = - Math.cos(planet1) * 4;
     //objects[12] = Math.sin(planet1) * 4 -20;
+	
     objects[10] = Math.sin(planet1) * 3.5;
     objects[12] = -3 + (Math.cos(planet1) * 3.5);
 
     objects[23] = Math.sin(planet2) * 4;
     objects[25] = -3 + (Math.cos(planet2) * 4);
+	
 
     // setTimeout(renderLoop,1);            // Uncomment this line, and comment the next line
     if (running) requestAnimationFrame(renderLoop);     // to see how fast this could run...

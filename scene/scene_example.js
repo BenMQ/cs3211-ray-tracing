@@ -1,6 +1,6 @@
    var camera = [
       0,1.8,10,                     // x,y,z coordinates
-      0,3,0,                     // Direction normal vector
+      0,1.2,-10,                     // Direction normal vector
       45                         // field of view : example 45
    ];
 
