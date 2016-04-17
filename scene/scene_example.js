@@ -6,8 +6,7 @@
 
    var lights = [
       1,                         // number of lights
-      -30,-10,20, 0,1,0,        // light 1, x,y,z location, and rgb colour (green)
-      // 100,100,100, 1,1,1,        // light 2, x,y,z location, and rgb colour (white)
+      -30,-10,20, 1,1,1,        // light 1, x,y,z location, and rgb colour (white)
    ];
 
    var objects = [

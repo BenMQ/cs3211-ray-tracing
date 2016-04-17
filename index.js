@@ -197,7 +197,9 @@ function doit(mode) {
 						var baser = Objects[minIdx+2];
 						var baseg = Objects[minIdx+3];
 						var baseb = Objects[minIdx+4];
-						var lambertAmount = 0;
+						var lambertR = 0;
+						var lambertG = 0;
+						var lambertB = 0;
 						
 						if (Objects[minIdx+6] > 0) {
 
@@ -252,28 +254,32 @@ function doit(mode) {
 									lightrayZ = lightrayZ / length;
 									var contribution = dotProduct(lightrayX, lightrayY, lightrayZ, normalX, normalY, normalZ);
 									if (contribution > 0) {
-										lambertAmount = lambertAmount + contribution;
+										lambertR += contribution * Lights[j*6+4];
+										lambertG += contribution * Lights[j*6+5];
+										lambertB += contribution * Lights[j*6+6];
 									}
 								}
 							}
 						}
-						lambertAmount = Math.min(1, lambertAmount);
+						lambertR = Math.min(1, lambertR);
+						lambertG = Math.min(1, lambertG);
+						lambertB = Math.min(1, lambertB);
 						if (remaining == 0) {
-							colorr0 = baser * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-							colorg0 = baseg * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-							colorb0 = baseb * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorr0 = baser * (lambertR * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorg0 = baseg * (lambertG * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorb0 = baseb * (lambertB * Objects[minIdx+6] + Objects[minIdx+7]);
 							specular0 = Objects[minIdx+5];
 						}
 						if (remaining == 1) {
-							colorr1 = baser * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-							colorg1 = baseg * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-							colorb1 = baseb * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorr1 = baser * (lambertR * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorg1 = baseg * (lambertG * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorb1 = baseb * (lambertB * Objects[minIdx+6] + Objects[minIdx+7]);
 							specular1 = Objects[minIdx+5];
 						}
 						if (remaining == 2) {
-							colorr2 = baser * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-							colorg2 = baseg * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-							colorb2 = baseb * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorr2 = baser * (lambertR * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorg2 = baseg * (lambertG * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorb2 = baseb * (lambertB * Objects[minIdx+6] + Objects[minIdx+7]);
 							specular2 = Objects[minIdx+5];
 						}
 						if (Objects[minIdx+5] > 0) {
