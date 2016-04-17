@@ -26,11 +26,42 @@ gpu.addFunction(sphereIntersection);
 for (var i = 0; i < vectorExports.length; i ++) {
     gpu.addFunction(vectorExports[i]);
 }
+function precompute(camera) {
+	var length = 0;
+
+	// eyeVector is a unit vector that represents the direction of the camera
+	var eyeVectorX = camera[3];
+	var eyeVectorY = camera[4];
+	var eyeVectorZ = camera[5];
+	length = vectorLength(eyeVectorX, eyeVectorY, eyeVectorZ);
+	eyeVectorX = eyeVectorX / length;
+	eyeVectorY = eyeVectorY / length;
+	eyeVectorZ = eyeVectorZ / length;
+
+	// vpRight is the unit vector that points to the right of the camera
+	var vpRightX = crossProductX(eyeVectorX, eyeVectorY, eyeVectorZ, 0, 1, 0);
+	var vpRightY = crossProductY(eyeVectorX, eyeVectorY, eyeVectorZ, 0, 1, 0);
+	var vpRightZ = crossProductZ(eyeVectorX, eyeVectorY, eyeVectorZ, 0, 1, 0);
+	length = vectorLength(vpRightX, vpRightY, vpRightZ);
+	vpRightX = vpRightX / length;
+	vpRightY = vpRightY / length;
+	vpRightZ = vpRightZ / length;
+
+	// vpUp is the unit vector that points upwards at the camera
+	var vpUpX = crossProductX(vpRightX, vpRightY, vpRightZ, eyeVectorX, eyeVectorY, eyeVectorZ);
+	var vpUpY = crossProductY(vpRightX, vpRightY, vpRightZ, eyeVectorX, eyeVectorY, eyeVectorZ);
+	var vpUpZ = crossProductZ(vpRightX, vpRightY, vpRightZ, eyeVectorX, eyeVectorY, eyeVectorZ);
+	length = vectorLength(vpUpX, vpUpY, vpUpZ);
+	vpUpX = vpUpX / length;
+	vpUpY = vpUpY / length;
+	vpUpZ = vpUpZ / length;
+	return [eyeVectorX, eyeVectorY, eyeVectorZ, vpRightX, vpRightY, vpRightZ, vpUpX, vpUpY, vpUpZ];
+}
 
 function doit(mode) {
     var opt = {
         dimensions: [800,600],
-        debug: true,
+        debug: false,
         graphical: true,
         safeTextureReadHack: false,
         constants: { OBJCOUNT: objects[0], LIGHTCOUNT: lights[0],
@@ -41,39 +72,27 @@ function doit(mode) {
         mode: mode,
     };
 
-    var y = gpu.createKernel(function(Camera,Lights,Objects,Options) {
+    var y = gpu.createKernel(function(Camera,Lights,Objects,Options,Precompute) {
         var length = 0;
 
 		var antiAliasingX = Options[0];
 		var antiAliasingY = Options[1];
 		
 		// eyeVector is a unit vector that represents the direction of the camera
-        var eyeVectorX = Camera[3];
-        var eyeVectorY = Camera[4];
-        var eyeVectorZ = Camera[5];
-        length = vectorLength(eyeVectorX, eyeVectorY, eyeVectorZ);
-        eyeVectorX = eyeVectorX / length;
-        eyeVectorY = eyeVectorY / length;
-        eyeVectorZ = eyeVectorZ / length;
+        var eyeVectorX = Precompute[0];
+        var eyeVectorY = Precompute[1];
+        var eyeVectorZ = Precompute[2];
 
 
         // vpRight is the unit vector that points to the right of the camera
-        var vpRightX = crossProductX(eyeVectorX, eyeVectorY, eyeVectorZ, 0, 1, 0);
-        var vpRightY = crossProductY(eyeVectorX, eyeVectorY, eyeVectorZ, 0, 1, 0);
-        var vpRightZ = crossProductZ(eyeVectorX, eyeVectorY, eyeVectorZ, 0, 1, 0);
-        length = vectorLength(vpRightX, vpRightY, vpRightZ);
-        vpRightX = vpRightX / length;
-        vpRightY = vpRightY / length;
-        vpRightZ = vpRightZ / length;
+        var vpRightX = Precompute[3];
+        var vpRightY = Precompute[4];
+        var vpRightZ = Precompute[5];
 
 		// vpUp is the unit vector that points upwards at the camera
-        var vpUpX = crossProductX(vpRightX, vpRightY, vpRightZ, eyeVectorX, eyeVectorY, eyeVectorZ);
-        var vpUpY = crossProductY(vpRightX, vpRightY, vpRightZ, eyeVectorX, eyeVectorY, eyeVectorZ);
-        var vpUpZ = crossProductZ(vpRightX, vpRightY, vpRightZ, eyeVectorX, eyeVectorY, eyeVectorZ);
-        length = vectorLength(vpUpX, vpUpY, vpUpZ);
-        vpUpX = vpUpX / length;
-        vpUpY = vpUpY / length;
-        vpUpZ = vpUpZ / length;
+        var vpUpX = Precompute[6];
+        var vpUpY = Precompute[7];
+        var vpUpZ = Precompute[8];
 
         // Camera[6] is fov.
         var fov = Camera[6];
@@ -124,7 +143,8 @@ function doit(mode) {
 				rayZ = rayZ / length;
 
 				// maximum level of reflection of light.
-				var remaining = 3;
+				var maxBounce = 2;
+				var reflectionLevel = -1;
 				// for each level of reflection, store their RGB value and specular coefficient separately
 				// since we do not have a stack for recursive function call.
 				var colorr0 = 0;
@@ -143,8 +163,8 @@ function doit(mode) {
 				// or if the object has a specular coefficient of zero.
 				var goesIntoBackground = 0;
 				var isSpecular = 1;
-				while (remaining > 0 && goesIntoBackground == 0 && isSpecular == 1) {
-					remaining = remaining - 1;
+				while (reflectionLevel < maxBounce && goesIntoBackground == 0 && isSpecular == 1) {
+					reflectionLevel += 1;
 					var idx = 1;                                     // index for looking through all the objects
 					var nextidx = 1;
 					// gpu.js does not support Infinity value, so use a separate flag instead.
@@ -163,7 +183,7 @@ function doit(mode) {
 								Objects[idx+12],
 								viewX, viewY, viewZ,
 								rayX, rayY, rayZ, this.constants.ERROR_NO_SUCH_VALUE);
-							if ((minDistIsInfinity == 1 || distance < minDist) && distance != this.constants.ERROR_NO_SUCH_VALUE && distance > 0 ){
+							if ((minDistIsInfinity == 1 || distance < minDist) && distance != this.constants.ERROR_NO_SUCH_VALUE && distance > -0.005 ){
 								minDist = distance;
 								minIdx = idx;
 								minDistIsInfinity = 0;
@@ -223,7 +243,7 @@ function doit(mode) {
 											Objects[idx1+12],
 											Lights[j*6+1], Lights[j*6+2], Lights[j*6+3],
 											lightrayX, lightrayY, lightrayZ, this.constants.ERROR_NO_SUCH_VALUE);
-										if ((minDistIsInfinity1 == 1 || distance < minDist1) && distance > 0 && distance != this.constants.ERROR_NO_SUCH_VALUE) {
+										if ((minDistIsInfinity1 == 1 || distance < minDist1) && distance > -0.005 && distance != this.constants.ERROR_NO_SUCH_VALUE) {
 											minDist1 = distance;
 											minIdx1 = idx1;
 											minDistIsInfinity1 = 0;
@@ -254,19 +274,19 @@ function doit(mode) {
 						lambertB = Math.min(1, lambertB);
 						// At each reflection level, we compute the color due to ambient lighting 
 						// as well as lambertian reflectance. Also store the specular coefficient.
-						if (remaining == 0) {
+						if (reflectionLevel == 0) {
 							colorr0 = baser * (lambertR * Objects[minIdx+6] + Objects[minIdx+7]);
 							colorg0 = baseg * (lambertG * Objects[minIdx+6] + Objects[minIdx+7]);
 							colorb0 = baseb * (lambertB * Objects[minIdx+6] + Objects[minIdx+7]);
 							specular0 = Objects[minIdx+5];
 						}
-						if (remaining == 1) {
+						if (reflectionLevel == 1) {
 							colorr1 = baser * (lambertR * Objects[minIdx+6] + Objects[minIdx+7]);
 							colorg1 = baseg * (lambertG * Objects[minIdx+6] + Objects[minIdx+7]);
 							colorb1 = baseb * (lambertB * Objects[minIdx+6] + Objects[minIdx+7]);
 							specular1 = Objects[minIdx+5];
 						}
-						if (remaining == 2) {
+						if (reflectionLevel == 2) {
 							colorr2 = baser * (lambertR * Objects[minIdx+6] + Objects[minIdx+7]);
 							colorg2 = baseg * (lambertG * Objects[minIdx+6] + Objects[minIdx+7]);
 							colorb2 = baseb * (lambertB * Objects[minIdx+6] + Objects[minIdx+7]);
@@ -291,15 +311,15 @@ function doit(mode) {
 				}
 				// End of reflection loop.
 				// By default, the background color is grey if the ray from camera never hit anything.
-				if (goesIntoBackground == 1 && remaining == 2) {
+				if (goesIntoBackground == 1 && reflectionLevel == 0) {
 					mixR = mixR + 0.95;
 					mixG = mixG + 0.95;
 					mixB = mixB + 0.95;
 				} else {
 					// Otherwise, compute the ambient+diffuse+specular color
-					mixR = mixR + colorr2 + specular2 * (colorr1 + specular1 * colorr0); 
-					mixG = mixG + colorg2 + specular2 * (colorg1 + specular1 * colorg0);
-					mixB = mixB + colorb2 + specular2 * (colorb1 + specular1 * colorb0);
+					mixR = mixR + colorr0 + specular0 * (colorr1 + specular1 * colorr2); 
+					mixG = mixG + colorg0 + specular0 * (colorg1 + specular1 * colorg2);
+					mixB = mixB + colorb0 + specular0 * (colorb1 + specular1 * colorb2);
 				}
 				ySuperSamplingOffset = ySuperSamplingOffset + 1;
 			}

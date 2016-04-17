@@ -1,4 +1,4 @@
-   var camera = [
+  var camera = [
       0,1,2,                     // x,y,z coordinates                                                                                   
       4,4,4,                     // Direction normal vector                                                                             
       45                         // field of view : example 45                                                                          
