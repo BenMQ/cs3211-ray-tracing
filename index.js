@@ -14,9 +14,6 @@ function change( el ) {
 
 var gpu = new GPU();
 
-function dot(ax, ay, az, bx, by, bz) {
-    return (ax * bx) + (ay * by) + (az * bz);
-}
 // center x/y/z is the center of the sphere
 // radius is the radius of the sphere
 // source x/y/z is the source of the ray
@@ -28,9 +25,9 @@ function sphereIntersection(centerx, centery, centerz, radius, sourcex, sourcey,
     var eyeToCenterY = centery - sourcey;
     var eyeToCenterZ = centerz - sourcez;
     // v = Vector.dotProduct(eye_to_center, ray.vector)
-    var v = dot(eyeToCenterX, eyeToCenterY, eyeToCenterZ, rayx, rayy, rayz);
+    var v = dotProduct(eyeToCenterX, eyeToCenterY, eyeToCenterZ, rayx, rayy, rayz);
     // eoDot = Vector.dotProduct(eye_to_center, eye_to_center),
-    var eoDot = dot(eyeToCenterX, eyeToCenterY, eyeToCenterZ, eyeToCenterX, eyeToCenterY, eyeToCenterZ);
+    var eoDot = dotProduct(eyeToCenterX, eyeToCenterY, eyeToCenterZ, eyeToCenterX, eyeToCenterY, eyeToCenterZ);
     var discriminant = (radius * radius) - eoDot + (v * v);
     if (discriminant < 0) {
         return -9981;
@@ -42,19 +39,9 @@ for (var i = 0; i < vectorExports.length; i ++) {
     //console.log(vectorExports[i]);
     gpu.addFunction(vectorExports[i]);
 }
-gpu.addFunction(dot);
 
 gpu.addFunction(sphereIntersection);
 
-function sphereNormal(centerx, centery, centerz, posx, posy, posz) {
-    var x = posx - centerx;
-    var y = posy - centery;
-    var z = posz - centerz;
-    var length = vectorLength(x, y, z);
-    x = x / length;
-    y = y / length;
-    z = z / length;
-}
 
 function doit(mode) {
     var opt = {
@@ -70,10 +57,11 @@ function doit(mode) {
         mode: mode,
     };
 
-    var y = gpu.createKernel(function(Camera,Lights,Objects) {
+    var y = gpu.createKernel(function(Camera,Lights,Objects,Options) {
         var length = 0;
         // var eyeVector = Vector.unitVector(Vector.subtract(cameraVector, cameraPos));
-
+		var antiAliasingX = Options[0];
+		var antiAliasingY = Options[1];
         var eyeVectorX = Camera[3];// - Camera[0];
         var eyeVectorY = Camera[4];// - Camera[1];
         var eyeVectorZ = Camera[5];// - Camera[2];
@@ -113,206 +101,225 @@ function doit(mode) {
         var camerawidth = halfWidth * 2;
         var cameraheight = halfHeight * 2;
         var pixelWidth = camerawidth / (this.dimensions.x - 1);
+		var supersamplingWidth = pixelWidth / antiAliasingX;
         var pixelHeight = cameraheight / (this.dimensions.y - 1);
+		var supersamplingHeight = pixelHeight / antiAliasingY;
 
-        // var xcomp = Vector.scale(vpRight, (x * pixelWidth) - halfWidth),
-        //     ycomp = Vector.scale(vpUp, (y * pixelHeight) - halfHeight);
-        var xdist = this.thread.x * pixelWidth - halfWidth;
-        var ydist = this.thread.y * pixelHeight - halfHeight;
-        var xcompX = vpRightX * xdist;
-        var xcompY = vpRightY * xdist;
-        var xcompZ = vpRightZ * xdist;
+		var xSuperSamplingOffset = 0;
+		var ySuperSamplingOffset = 0;
+		var mixR = 0;
+		var mixG = 0;
+		var mixB = 0;
+		while (xSuperSamplingOffset < antiAliasingX) {
+			ySuperSamplingOffset = 0;
+			while (ySuperSamplingOffset < antiAliasingY) {
+				// var xcomp = Vector.scale(vpRight, (x * pixelWidth) - halfWidth),
+				//     ycomp = Vector.scale(vpUp, (y * pixelHeight) - halfHeight);
+				var xdist = (this.thread.x - 0.5) * pixelWidth - halfWidth + supersamplingWidth * (0.5 + xSuperSamplingOffset);
+				var ydist = (this.thread.y - 0.5) * pixelHeight - halfHeight + supersamplingHeight * (0.5 + ySuperSamplingOffset);
+				var xcompX = vpRightX * xdist;
+				var xcompY = vpRightY * xdist;
+				var xcompZ = vpRightZ * xdist;
 
-        var ycompX = vpUpX * ydist;
-        var ycompY = vpUpY * ydist;
-        var ycompZ = vpUpZ * ydist;
+				var ycompX = vpUpX * ydist;
+				var ycompY = vpUpY * ydist;
+				var ycompZ = vpUpZ * ydist;
 
-        var rayX = eyeVectorX + xcompX + ycompX;
-        var rayY = eyeVectorY + xcompY + ycompY;
-        var rayZ = eyeVectorZ + xcompZ + ycompZ;
-		var viewX = Camera[0];
-		var viewY = Camera[1];
-		var viewZ = Camera[2];
-        length = vectorLength(rayX, rayY, rayZ);
+				var rayX = eyeVectorX + xcompX + ycompX;
+				var rayY = eyeVectorY + xcompY + ycompY;
+				var rayZ = eyeVectorZ + xcompZ + ycompZ;
+				var viewX = Camera[0];
+				var viewY = Camera[1];
+				var viewZ = Camera[2];
+				length = vectorLength(rayX, rayY, rayZ);
 
-        // ray is now a vector from camera for each pixel.
-        rayX = rayX / length;
-        rayY = rayY / length;
-        rayZ = rayZ / length;
-		var remaining = 3;
-		var colorr0 = 0;
-		var colorg0 = 0;
-		var colorb0 = 0;
-		var specular0 = 0;
-		var colorr1 = 0;
-		var colorg1 = 0;
-		var colorb1 = 0;
-		var specular1 = 0;
-		var colorr2 = 0;
-		var colorg2 = 0;
-		var colorb2 = 0;
-		var specular2 = 0;
-		var goesIntoBackground = 0;
-		var isSpecular = 1;
-		while (remaining > 0 && goesIntoBackground == 0 && isSpecular == 1) {
-			remaining = remaining - 1;
-			var idx = 1;                                     // index for looking through all the objects
-			var nextidx = 1;
-			var minDistIsInfinity = 1;
-			var minDist = -1; // -1 for infinity
-			var minIdx = -1; // idx of the object that intersect with the ray
+				// ray is now a vector from camera for each pixel.
+				rayX = rayX / length;
+				rayY = rayY / length;
+				rayZ = rayZ / length;
+				var remaining = 3;
+				var colorr0 = 0;
+				var colorg0 = 0;
+				var colorb0 = 0;
+				var specular0 = 0;
+				var colorr1 = 0;
+				var colorg1 = 0;
+				var colorb1 = 0;
+				var specular1 = 0;
+				var colorr2 = 0;
+				var colorg2 = 0;
+				var colorb2 = 0;
+				var specular2 = 0;
+				var goesIntoBackground = 0;
+				var isSpecular = 1;
+				while (remaining > 0 && goesIntoBackground == 0 && isSpecular == 1) {
+					remaining = remaining - 1;
+					var idx = 1;                                     // index for looking through all the objects
+					var nextidx = 1;
+					var minDistIsInfinity = 1;
+					var minDist = -1; // -1 for infinity
+					var minIdx = -1; // idx of the object that intersect with the ray
 
-			for (var i=0; i<this.constants.OBJCOUNT; i++ ) {     // Look at all object records
-				idx = nextidx;                               // Skip to next record
-				nextidx = Objects[idx+1]+idx;                // Pre-compute the beginning of the next record
-				if (Objects[idx] == this.constants.SPHERE) { // i.e. if it is a SPHERE...
-					// var centerx = Objects[idx+9];
-					// var centery = Objects[idx+10];
-					// var centerz = Objects[idx+11];
-					// var radius = Objects[idx+12];
-					var distance = sphereIntersection(
-						Objects[idx+9], Objects[idx+10], Objects[idx+11],
-						Objects[idx+12],
-						viewX, viewY, viewZ,
-						rayX, rayY, rayZ);
-					if ((minDistIsInfinity == 1 || distance < minDist) && distance != -9981  && distance > 0 ){
-						minDist = distance;
-						minIdx = idx;
-						minDistIsInfinity = 0;
+					for (var i=0; i<this.constants.OBJCOUNT; i++ ) {     // Look at all object records
+						idx = nextidx;                               // Skip to next record
+						nextidx = Objects[idx+1]+idx;                // Pre-compute the beginning of the next record
+						if (Objects[idx] == this.constants.SPHERE) { // i.e. if it is a SPHERE...
+							// var centerx = Objects[idx+9];
+							// var centery = Objects[idx+10];
+							// var centerz = Objects[idx+11];
+							// var radius = Objects[idx+12];
+							var distance = sphereIntersection(
+								Objects[idx+9], Objects[idx+10], Objects[idx+11],
+								Objects[idx+12],
+								viewX, viewY, viewZ,
+								rayX, rayY, rayZ);
+							if ((minDistIsInfinity == 1 || distance < minDist) && distance != -9981  && distance > 0 ){
+								minDist = distance;
+								minIdx = idx;
+								minDistIsInfinity = 0;
+							}
+						}
 					}
-				}
-			}
-			if (minDist >= 0) {
-				goesIntoBackground = 0;
-				// var pointAtTime = Vector.add(ray.point, Vector.scale(ray.vector, dist));
-				var pointAtTimeX = viewX + rayX * minDist;
-				var pointAtTimeY = viewY + rayY * minDist;
-				var pointAtTimeZ = viewZ + rayZ * minDist;
-				var normalX = pointAtTimeX - Objects[minIdx+9];
-				var normalY = pointAtTimeY - Objects[minIdx+10];
-				var normalZ = pointAtTimeZ - Objects[minIdx+11];
-				length = vectorLength(normalX, normalY, normalZ);
-				normalX = normalX / length;
-				normalY = normalY / length;
-				normalZ = normalZ / length;
+					if (minDist >= 0) {
+						goesIntoBackground = 0;
+						// var pointAtTime = Vector.add(ray.point, Vector.scale(ray.vector, dist));
+						var pointAtTimeX = viewX + rayX * minDist;
+						var pointAtTimeY = viewY + rayY * minDist;
+						var pointAtTimeZ = viewZ + rayZ * minDist;
+						var normalX = pointAtTimeX - Objects[minIdx+9];
+						var normalY = pointAtTimeY - Objects[minIdx+10];
+						var normalZ = pointAtTimeZ - Objects[minIdx+11];
+						length = vectorLength(normalX, normalY, normalZ);
+						normalX = normalX / length;
+						normalY = normalY / length;
+						normalZ = normalZ / length;
 
-				var baser = Objects[minIdx+2];
-				var baseg = Objects[minIdx+3];
-				var baseb = Objects[minIdx+4];
-				var lambertAmount = 0;
-				
-				if (Objects[minIdx+6] > 0) {
+						var baser = Objects[minIdx+2];
+						var baseg = Objects[minIdx+3];
+						var baseb = Objects[minIdx+4];
+						var lambertAmount = 0;
+						
+						if (Objects[minIdx+6] > 0) {
 
-					for (var j=0; j<this.constants.LIGHTCOUNT; j++ ) {     // Look at all object records
-						// idx = idx + 6;
-						// var lightX = Lights[idx];
-						// var lightY = Lights[idx+1];
-						// var lightZ = Lights[idx+2];
+							for (var j=0; j<this.constants.LIGHTCOUNT; j++ ) {     // Look at all object records
+								// idx = idx + 6;
+								// var lightX = Lights[idx];
+								// var lightY = Lights[idx+1];
+								// var lightZ = Lights[idx+2];
 
-						var lightrayX = pointAtTimeX - Lights[j*6+1];
-						var lightrayY = pointAtTimeY - Lights[j*6+2];
-						var lightrayZ = pointAtTimeZ - Lights[j*6+3];
-						length = vectorLength(lightrayX, lightrayY, lightrayZ);
-						lightrayX = lightrayX / length;
-						lightrayY = lightrayY / length;
-						lightrayZ = lightrayZ / length;
-						var minDistIsInfinity1 = 1;
-						var minDist1 = -1; // -1 for infinity
-						var minIdx1 = -1;
-						var nextidx1 = 1;
-						var idx1 = 1;
-						for (var k=0; k<this.constants.OBJCOUNT; k++ ) {
-							idx1 = nextidx1;
-							nextidx1 = Objects[idx1+1]+idx1;
-							if (Objects[idx1] == this.constants.SPHERE) {
-								// var centerx = Objects[idx+9];
-								// var centery = Objects[idx+10];
-								// var centerz = Objects[idx+11];
-								// var radius = Objects[idx+12];
-								
-								var distance = sphereIntersection(
-									Objects[idx1+9], Objects[idx1+10], Objects[idx1+11],
-									Objects[idx1+12],
-									Lights[j*6+1], Lights[j*6+2], Lights[j*6+3],
-									lightrayX, lightrayY, lightrayZ);
-								if ((minDistIsInfinity1 == 1 || distance < minDist1) && distance > 0 && distance != -9981) {
-									minDist1 = distance;
-									minIdx1 = idx1;
-									minDistIsInfinity1 = 0;
+								var lightrayX = pointAtTimeX - Lights[j*6+1];
+								var lightrayY = pointAtTimeY - Lights[j*6+2];
+								var lightrayZ = pointAtTimeZ - Lights[j*6+3];
+								length = vectorLength(lightrayX, lightrayY, lightrayZ);
+								lightrayX = lightrayX / length;
+								lightrayY = lightrayY / length;
+								lightrayZ = lightrayZ / length;
+								var minDistIsInfinity1 = 1;
+								var minDist1 = -1; // -1 for infinity
+								var minIdx1 = -1;
+								var nextidx1 = 1;
+								var idx1 = 1;
+								for (var k=0; k<this.constants.OBJCOUNT; k++ ) {
+									idx1 = nextidx1;
+									nextidx1 = Objects[idx1+1]+idx1;
+									if (Objects[idx1] == this.constants.SPHERE) {
+										// var centerx = Objects[idx+9];
+										// var centery = Objects[idx+10];
+										// var centerz = Objects[idx+11];
+										// var radius = Objects[idx+12];
+										
+										var distance = sphereIntersection(
+											Objects[idx1+9], Objects[idx1+10], Objects[idx1+11],
+											Objects[idx1+12],
+											Lights[j*6+1], Lights[j*6+2], Lights[j*6+3],
+											lightrayX, lightrayY, lightrayZ);
+										if ((minDistIsInfinity1 == 1 || distance < minDist1) && distance > 0 && distance != -9981) {
+											minDist1 = distance;
+											minIdx1 = idx1;
+											minDistIsInfinity1 = 0;
+										}
+									}
+								}
+								if (minDistIsInfinity1 == 1 || Math.abs(minDist1 - length) <= 0.005 ) { // light visible
+									//       var contribution = Vector.dotProduct(Vector.unitVector(
+									// Vector.subtract(lightPoint, pointAtTime)), normal);
+									lightrayX =  Lights[j*6+1] - pointAtTimeX;
+									lightrayY =  Lights[j*6+2] - pointAtTimeY;
+									lightrayZ =  Lights[j*6+3] - pointAtTimeZ;
+									length = vectorLength(lightrayX, lightrayY, lightrayZ);
+									lightrayX = lightrayX / length;
+									lightrayY = lightrayY / length;
+									lightrayZ = lightrayZ / length;
+									var contribution = dotProduct(lightrayX, lightrayY, lightrayZ, normalX, normalY, normalZ);
+									if (contribution > 0) {
+										lambertAmount = lambertAmount + contribution;
+									}
 								}
 							}
 						}
-						if (minDistIsInfinity1 == 1 || Math.abs(minDist1 - length) <= 0.005 ) { // light visible
-							//       var contribution = Vector.dotProduct(Vector.unitVector(
-							// Vector.subtract(lightPoint, pointAtTime)), normal);
-							lightrayX =  Lights[j*6+1] - pointAtTimeX;
-							lightrayY =  Lights[j*6+2] - pointAtTimeY;
-							lightrayZ =  Lights[j*6+3] - pointAtTimeZ;
-							length = vectorLength(lightrayX, lightrayY, lightrayZ);
-							lightrayX = lightrayX / length;
-							lightrayY = lightrayY / length;
-							lightrayZ = lightrayZ / length;
-							var contribution = dotProduct(lightrayX, lightrayY, lightrayZ, normalX, normalY, normalZ);
-							if (contribution > 0) {
-								lambertAmount = lambertAmount + contribution;
-							}
+						lambertAmount = Math.min(1, lambertAmount);
+						if (remaining == 0) {
+							colorr0 = baser * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorg0 = baseg * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorb0 = baseb * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							specular0 = Objects[minIdx+5];
 						}
+						if (remaining == 1) {
+							colorr1 = baser * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorg1 = baseg * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorb1 = baseb * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							specular1 = Objects[minIdx+5];
+						}
+						if (remaining == 2) {
+							colorr2 = baser * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorg2 = baseg * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							colorb2 = baseb * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
+							specular2 = Objects[minIdx+5];
+						}
+						if (Objects[minIdx+5] > 0) {
+							var tmp = dotProduct(rayX, rayY, rayZ, normalX, normalY, normalZ);
+							// reflect the incident ray and update the vectors.
+							rayX = rayX - normalX * tmp * 2;
+							rayY = rayY - normalY * tmp * 2;
+							rayZ = rayZ - normalZ * tmp * 2;
+
+							viewX = pointAtTimeX;
+							viewY = pointAtTimeY;
+							viewZ = pointAtTimeZ;
+						} else {
+							isSpecular = 0;
+						}
+					} else {
+						goesIntoBackground = 1;
+						//this.color(0.95,0.95,0.95);                      // By default canvas is light grey
 					}
 				}
-				lambertAmount = Math.min(1, lambertAmount);
-				if (remaining == 0) {
-					colorr0 = baser * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-					colorg0 = baseg * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-					colorb0 = baseb * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-					specular0 = Objects[minIdx+5];
-				}
-				if (remaining == 1) {
-					colorr1 = baser * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-					colorg1 = baseg * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-					colorb1 = baseb * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-					specular1 = Objects[minIdx+5];
-				}
-				if (remaining == 2) {
-					colorr2 = baser * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-					colorg2 = baseg * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-					colorb2 = baseb * (lambertAmount * Objects[minIdx+6] + Objects[minIdx+7]);
-					specular2 = Objects[minIdx+5];
-				}
-				if (Objects[minIdx+5] > 0) {
-					var tmp = dotProduct(rayX, rayY, rayZ, normalX, normalY, normalZ);
-					// reflect the incident ray and update the vectors.
-					rayX = rayX - normalX * tmp * 2;
-					rayY = rayY - normalY * tmp * 2;
-					rayZ = rayZ - normalZ * tmp * 2;
-
-					viewX = pointAtTimeX;
-					viewY = pointAtTimeY;
-					viewZ = pointAtTimeZ;
+				if (goesIntoBackground == 1 && remaining == 2) {
+					// never hit anything
+					mixR = mixR + 0.95;
+					mixG = mixG + 0.95;
+					mixB = mixB + 0.95;
 				} else {
-					isSpecular = 0;
+					mixR = mixR + colorr2 + specular2 * (colorr1 + specular1 * colorr0); 
+					mixG = mixG + colorg2 + specular2 * (colorg1 + specular1 * colorg0);
+					mixB = mixB + colorb2 + specular2 * (colorb1 + specular1 * colorb0);
 				}
-			} else {
-				goesIntoBackground = 1;
-				//this.color(0.95,0.95,0.95);                      // By default canvas is light grey
+				ySuperSamplingOffset = ySuperSamplingOffset + 1;
 			}
+			xSuperSamplingOffset = xSuperSamplingOffset + 1;
 		}
-		if (goesIntoBackground == 1 && remaining == 2) {
-			// never hit anything
-			this.color(0.95, 0.95, 0.95);
-		} else {
-			this.color(
-				colorr2 + specular2 * (colorr1 + specular1 * colorr0), 
-				colorg2 + specular2 * (colorg1 + specular1 * colorg0), 
-				colorb2 + specular2 * (colorb1 + specular1 * colorb0)
-			);
-		}
+        mixR = mixR / antiAliasingX / antiAliasingY;
+		mixG = mixG / antiAliasingX / antiAliasingY;
+		mixB = mixB / antiAliasingX / antiAliasingY;
+		this.color(mixR, mixG, mixB);
     }, opt);
     return y;
 }
 
+var options = [1,1];
 var mykernel = doit("gpu");
 var mycode   = doit("cpu");
-gl = mykernel(camera,lights,objects);
+gl = mykernel(camera,lights,objects,options);
 // return ;
 var canvas = mykernel.getCanvas();
 document.getElementsByTagName('body')[0].appendChild(canvas);
@@ -333,13 +340,13 @@ var planet1 = 0,
 function renderLoop() {
     f.innerHTML = fps.getFPS();
     if (selection === 0) {
-        mycode(camera,lights,objects);
+        mycode(camera,lights,objects,options);
         var cv = document.getElementsByTagName("canvas")[0];
         var bdy = cv.parentNode;
         var newCanvas = mycode.getCanvas();
         bdy.replaceChild(newCanvas, cv);
     } else {
-        mykernel(camera,lights,objects);
+        mykernel(camera,lights,objects,options);
         var cv = document.getElementsByTagName("canvas")[0];
         var bdy = cv.parentNode;
         var newCanvas = mykernel.getCanvas();
