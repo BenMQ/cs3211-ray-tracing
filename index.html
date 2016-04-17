@@ -22,17 +22,25 @@
 <script src="scene/scene_example.js?nocache"></script>
 
 <div class="container">
-	<h1>Ray Tracing with <a href="http://gpu.rocks/">GPU.js</a></h1>
+	<h1>Ray Tracing with <a href="http://gpu.rocks/">GPU.js</a> <small>Chen Minqi A0099314Y</small></h1>
 	<hr>
 	
 	<div class="row">
 		<div class="col-md-4">
-			<div class="panel panel-default">
-				<div class="panel-heading">FPS</div>
+			<div class="panel panel-primary">
+				<div class="panel-heading">Scene</div>
 				<div class="panel-body">
 					<div class="row">
-						<div class="col-md-7">Current FPS: <span id="fps"></span></div>
-						<div class="col-md-5"><button class="btn btn-danger btn-sm" id='stop' type="button">STOP</button></div>
+						<div class="col-md-10">
+							<select id="scene-select" class="form-control">
+								<option selected="selected" value="colored_lights">Colored Light Sources</option>
+								<option value="demo">Demo provided by Hugh</option>
+								<option value="example">An animated scene</option>
+								<option value="two_lights">Two light sources</option>
+								<option value="bounces">Reflection demo</option>
+								<option value="default">scene/scene.js (replace this to test your scene)</option>
+							</select>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -52,11 +60,11 @@
 		</div>
 		<div class="col-md-2">
 			<div class="panel panel-default">
-				<div class="panel-heading">Rendering Mode</div>
+				<div class="panel-heading">FPS</div>
 				<div class="panel-body">
-					<div class="btn-group btn-group-sm" role="group">
-						<button class="btn btn-default render-toggle" id='toggleCPU' type="button">CPU</button>
-						<button class="btn btn-default render-toggle active" id='toggleGPU' type="button">GPU</button>
+					<div class="row">
+						<div class="col-md-4"><span id="fps"></span></div>
+						<div class="col-md-8"><button class="btn btn-danger btn-sm" id='stop' type="button">STOP</button></div>
 					</div>
 				</div>
 			</div>
@@ -73,7 +81,7 @@
 					</div>
 					<div class="row">
 						<div class="col-md-4"><button class="btn btn-default pan-toggle btn-block" type="button">Left</button></div>
-						<div class="col-md-4"></div>
+						<div class="col-md-4"><button class="btn btn-default btn-block" id="reset-camera" type="button">Reset</button></div>
 						<div class="col-md-4"><button class="btn btn-default pan-toggle btn-block" type="button">Right</button></div>
 					</div>
 					<div class="row">
@@ -107,9 +115,12 @@
 		</div>
 		<div class="col-md-2">
 			<div class="panel panel-default">
-				<div class="panel-heading">Reset</div>
+				<div class="panel-heading">Rendering Mode</div>
 				<div class="panel-body">
-					<button class="btn btn-default tilt-toggle" id="reset-camera" type="button">Reset Camera</button>
+					<div class="btn-group btn-group-sm" role="group">
+						<button class="btn btn-default render-toggle" id='toggleCPU' type="button">CPU</button>
+						<button class="btn btn-default render-toggle active" id='toggleGPU' type="button">GPU</button>
+					</div>
 				</div>
 			</div>
 		</div>

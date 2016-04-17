@@ -42,6 +42,10 @@ $('.aa-toggle').click(function() {
 	}
 });
 
+$('#scene-select').change(function() {
+	changeScene($(this).val());
+});
+
 var cameraHandler; // declared here to make it visible to clearInterval.
 var panSpeed = 0.1;
 var maxSpeed = 5;
@@ -56,13 +60,57 @@ $('.pan-toggle').mousedown(function(){
 
 
 // compute camera direction
+var scene_data=[];
+var defaultCamera, precomputed;
+// eyeVector is a unit vector that represents the direction of the camera
+var eyeVectorX, eyeVectorY, eyeVectorZ;
 
-var scene_data = example();
-camera=scene_data[0].slice(0, scene_data[0].length);
-lights=scene_data[1].slice(0, scene_data[1].length);
-objects=scene_data[2].slice(0, scene_data[2].length);
-var defaultCamera = camera.slice(0, camera.length);
-var precomputed = precompute(camera);
+
+// vpRight is the unit vector that points to the right of the camera
+var vpRightX, vpRightY, vpRightZ;
+
+// vpUp is the unit vector that points upwards at the camera
+var vpUpX, vpUpY, vpUpZ;
+
+
+var default_camera=camera.slice(0, camera.length);
+var default_lights=lights.slice(0, lights.length);
+var default_objects=objects.slice(0, objects.length);
+changeScene('colored_lights');
+function changeScene(val) {
+	if (SAMPLE_SCENES[val]) {
+		scene_data = SAMPLE_SCENES[val]();
+				
+		camera=scene_data[0].slice(0, scene_data[0].length);
+		lights=scene_data[1].slice(0, scene_data[1].length);
+		objects=scene_data[2].slice(0, scene_data[2].length);
+	} else {
+		scene_data = [];
+		camera=default_camera.slice(0, default_camera.length);
+		lights=default_lights.slice(0, default_lights.length);
+		objects=default_objects.slice(0, default_objects.length);
+	}	
+	mykernel = doit("gpu");
+	mycode   = doit("cpu");	
+	defaultCamera = camera.slice(0, camera.length);
+
+	precomputed = precompute(camera);
+	// eyeVector is a unit vector that represents the direction of the camera
+	eyeVectorX = precomputed[0];
+	eyeVectorY = precomputed[1];
+	eyeVectorZ = precomputed[2];
+
+
+	// vpRight is the unit vector that points to the right of the camera
+	vpRightX = precomputed[3];
+	vpRightY = precomputed[4];
+	vpRightZ = precomputed[5];
+
+	// vpUp is the unit vector that points upwards at the camera
+	vpUpX = precomputed[6];
+	vpUpY = precomputed[7];
+	vpUpZ = precomputed[8];
+}
 
 
 function handlePan(dir) {
