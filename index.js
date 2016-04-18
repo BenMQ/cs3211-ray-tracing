@@ -1,4 +1,4 @@
-// This file is mainly setup code. For gpu.js code, go to ./js/main.js
+// This file is mainly setup code. For gpu.js code, go to ./main.js
 $(function() {
 
 var useGPU = 1;
@@ -65,14 +65,13 @@ var defaultCamera, precomputed;
 // eyeVector is a unit vector that represents the direction of the camera
 var eyeVectorX, eyeVectorY, eyeVectorZ;
 
-
 // vpRight is the unit vector that points to the right of the camera
 var vpRightX, vpRightY, vpRightZ;
 
 // vpUp is the unit vector that points upwards at the camera
 var vpUpX, vpUpY, vpUpZ;
 
-
+// make a copy of default values 
 var default_camera=camera.slice(0, camera.length);
 var default_lights=lights.slice(0, lights.length);
 var default_objects=objects.slice(0, objects.length);

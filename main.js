@@ -26,6 +26,8 @@ gpu.addFunction(sphereIntersection);
 for (var i = 0; i < vectorExports.length; i ++) {
     gpu.addFunction(vectorExports[i]);
 }
+
+// Pre-compute the axis for camera 
 function precompute(camera) {
 	var length = 0;
 
