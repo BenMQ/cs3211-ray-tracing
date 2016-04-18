@@ -27,7 +27,7 @@ for (var i = 0; i < vectorExports.length; i ++) {
     gpu.addFunction(vectorExports[i]);
 }
 
-// Pre-compute the axis for camera 
+// Pre-compute the axis for camera
 function precompute(camera) {
 	var length = 0;
 
@@ -79,7 +79,7 @@ function doit(mode) {
 
 		var antiAliasingX = Options[0];
 		var antiAliasingY = Options[1];
-		
+
 		// eyeVector is a unit vector that represents the direction of the camera
         var eyeVectorX = Precompute[0];
         var eyeVectorY = Precompute[1];
@@ -111,14 +111,14 @@ function doit(mode) {
 
 		var xSuperSamplingOffset = 0;
 		var ySuperSamplingOffset = 0;
-		
+
 		// mix stores the RGB color of all sampled points within a pixel when performing super sampling.
 		var mixR = 0;
 		var mixG = 0;
 		var mixB = 0;
 		// super sampling anti-aliasing.
 		// Note that in theory, this should be done in parallel (e.g. each thread handle one sample ray)
-		// but due to how gpu.js compiles and converts result between js and WebGL, this is much faster 
+		// but due to how gpu.js compiles and converts result between js and WebGL, this is much faster
 		while (xSuperSamplingOffset < antiAliasingX) {
 			ySuperSamplingOffset = 0;
 			while (ySuperSamplingOffset < antiAliasingY) {
@@ -127,7 +127,7 @@ function doit(mode) {
 				var viewX = Camera[0];
 				var viewY = Camera[1];
 				var viewZ = Camera[2];
-				
+
 				var xdist = (this.thread.x - 0.5) * pixelWidth - halfWidth + supersamplingWidth * (0.5 + xSuperSamplingOffset);
 				var ydist = (this.thread.y - 0.5) * pixelHeight - halfHeight + supersamplingHeight * (0.5 + ySuperSamplingOffset);
 				var xcompX = vpRightX * xdist;
@@ -171,13 +171,13 @@ function doit(mode) {
 					var nextidx = 1;
 					// gpu.js does not support Infinity value, so use a separate flag instead.
 					var minDistIsInfinity = 1;
-					var minDist = -1;  
+					var minDist = -1;
 					var minIdx = -1; // idx of the object that intersect with the ray
 
 					for (var i=0; i<this.constants.OBJCOUNT; i++ ) {     // Look at all object records
 						idx = nextidx;                               // Skip to next record
 						nextidx = Objects[idx+1]+idx;                // Pre-compute the beginning of the next record
-						if (Objects[idx] == this.constants.SPHERE) { // i.e. if it is a SPHERE... 
+						if (Objects[idx] == this.constants.SPHERE) { // i.e. if it is a SPHERE...
 							// For each object, check if the ray intersects with it.
 							// Keep track of the object that is closest to the camera.
 							var distance = sphereIntersection(
@@ -217,11 +217,11 @@ function doit(mode) {
 						var lambertR = 0;
 						var lambertG = 0;
 						var lambertB = 0;
-						
-						// Compute the color due to lambertian reflectance 
+
+						// Compute the color due to lambertian reflectance
 						if (Objects[minIdx+6] > 0) {
 							for (var j=0; j<this.constants.LIGHTCOUNT; j++ ) {     // Look at all light records
-								// To check if a light source is visible on the object surface is similar to ray/object intersection. 
+								// To check if a light source is visible on the object surface is similar to ray/object intersection.
 								// build a ray towards light source from the current point of intersection,
 								// and check if the ray can reach the light source.
 								var lightrayX = pointAtTimeX - Lights[j*6+1];
@@ -232,7 +232,7 @@ function doit(mode) {
 								lightrayY = lightrayY / length;
 								lightrayZ = lightrayZ / length;
 								var minDistIsInfinity1 = 1;
-								var minDist1 = -1;  
+								var minDist1 = -1;
 								var minIdx1 = -1;
 								var nextidx1 = 1;
 								var idx1 = 1;
@@ -274,7 +274,7 @@ function doit(mode) {
 						lambertR = Math.min(1, lambertR);
 						lambertG = Math.min(1, lambertG);
 						lambertB = Math.min(1, lambertB);
-						// At each reflection level, we compute the color due to ambient lighting 
+						// At each reflection level, we compute the color due to ambient lighting
 						// as well as lambertian reflectance. Also store the specular coefficient.
 						if (reflectionLevel == 0) {
 							colorr0 = baser * (lambertR * Objects[minIdx+6] + Objects[minIdx+7]);
@@ -319,7 +319,7 @@ function doit(mode) {
 					mixB = mixB + 0.95;
 				} else {
 					// Otherwise, compute the ambient+diffuse+specular color
-					mixR = mixR + colorr0 + specular0 * (colorr1 + specular1 * colorr2); 
+					mixR = mixR + colorr0 + specular0 * (colorr1 + specular1 * colorr2);
 					mixG = mixG + colorg0 + specular0 * (colorg1 + specular1 * colorg2);
 					mixB = mixB + colorb0 + specular0 * (colorb1 + specular1 * colorb2);
 				}
